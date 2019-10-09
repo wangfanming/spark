@@ -361,6 +361,7 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
   }
 
   override def defaultParallelism(): Int = {
+    //设置并行度，实际上决定的是我们的goalsize的值，而并不决定分区数
     conf.getInt("spark.default.parallelism", math.max(totalCoreCount.get(), 2))
   }
 

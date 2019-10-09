@@ -195,13 +195,17 @@ class HadoopRDD[K, V](
   }
 
   override def getPartitions: Array[Partition] = {
+    //获取job的配置文件
     val jobConf = getJobConf()
-    // add the credentials here as this can be called before SparkContext initialized
+    // add the credentials(证书) here as this can be called before SparkContext initialized
     SparkHadoopUtil.get.addCredentials(jobConf)
+    //获取输入的格式
     val inputFormat = getInputFormat(jobConf)
+    //获取分片信息 TextInputFormat extnens FileInputFoemat
     val inputSplits = inputFormat.getSplits(jobConf, minPartitions)
     val array = new Array[Partition](inputSplits.size)
     for (i <- 0 until inputSplits.size) {
+      //new 一个分区对象，并指定该分区对象RDD的id，分区位置，分片的具体信息FileSpilt
       array(i) = new HadoopPartition(id, i, inputSplits(i))
     }
     array
