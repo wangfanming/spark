@@ -2086,6 +2086,7 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
   /** Default level of parallelism to use when not given by user (e.g. parallelize and makeRDD). */
   def defaultParallelism: Int = {
     assertNotStopped()
+    //Go to TaskSchedulerImpl,实际上是从TaskSchedulerImpl中调用CoarseGrainedSchedulerBackend中的defaultParallelism获取并行度的设置
     taskScheduler.defaultParallelism
   }
 

@@ -448,6 +448,7 @@ private[spark] class TaskSchedulerImpl(
     starvationTimer.cancel()
   }
 
+  //backend : CoarseGrainedSchedulerBackend
   override def defaultParallelism(): Int = backend.defaultParallelism()
 
   // Check for speculatable tasks in all our active jobs.
