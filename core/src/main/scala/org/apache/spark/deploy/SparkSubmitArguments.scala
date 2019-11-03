@@ -35,7 +35,8 @@ import org.apache.spark.util.Utils
  * Parses and encapsulates arguments from the spark-submit script.
  * The env argument is used for testing.
  */
-private[deploy] class SparkSubmitArguments(args: Seq[String], env: Map[String, String] = sys.env)
+private[deploy] class SparkSubmitArguments
+(args: Seq[String], env: Map[String, String] = sys.env)
   extends SparkSubmitArgumentsParser {
   var master: String = null
   var deployMode: String = null
@@ -51,11 +52,11 @@ private[deploy] class SparkSubmitArguments(args: Seq[String], env: Map[String, S
   var numExecutors: String = null
   var files: String = null
   var archives: String = null
-  var mainClass: String = null
-  var primaryResource: String = null
+  var mainClass: String = null         //用户的main程序入口类
+  var primaryResource: String = null   //用户自身打包的jar
   var name: String = null
   var childArgs: ArrayBuffer[String] = new ArrayBuffer[String]()
-  var jars: String = null
+  var jars: String = null              //--jars 指定的jar包参数
   var packages: String = null
   var repositories: String = null
   var ivyRepoPath: String = null
@@ -94,6 +95,7 @@ private[deploy] class SparkSubmitArguments(args: Seq[String], env: Map[String, S
 
   // Set parameters from command line arguments
   try {
+    //解析spark-submit提交的参数，调用SparkSubmitOptionParser的parse方法
     parse(args.asJava)
   } catch {
     case e: IllegalArgumentException =>
@@ -450,6 +452,7 @@ private[deploy] class SparkSubmitArguments(args: Seq[String], env: Map[String, S
       SparkSubmit.printErrorAndExit(s"Unrecognized option '$opt'.")
     }
 
+    //用户自己打的jar
     primaryResource =
       if (!SparkSubmit.isShell(opt) && !SparkSubmit.isInternal(opt)) {
         Utils.resolveURI(opt).toString

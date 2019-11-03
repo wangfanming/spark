@@ -43,6 +43,7 @@ private[spark] abstract class EventLoop[E](name: String) extends Logging {
     override def run(): Unit = {
       try {
         while (!stopped.get) {
+          //从事件队列中获取事件
           val event = eventQueue.take()
           try {
             onReceive(event)
@@ -78,10 +79,10 @@ private[spark] abstract class EventLoop[E](name: String) extends Logging {
       eventThread.interrupt()
       var onStopCalled = false
       try {
-        eventThread.join()
+        eventThread.join()//一直阻塞，等待正在执行的event执行完成，就是等待onReceive执行完成
         // Call onStop after the event thread exits to make sure onReceive happens before onStop
         onStopCalled = true
-        onStop()
+        onStop()  //停止线程
       } catch {
         case ie: InterruptedException =>
           Thread.currentThread().interrupt()
@@ -100,6 +101,7 @@ private[spark] abstract class EventLoop[E](name: String) extends Logging {
    * Put the event into the event queue. The event thread will process it later.
    */
   def post(event: E): Unit = {
+    //将事件放入事件队列
     eventQueue.put(event)
   }
 

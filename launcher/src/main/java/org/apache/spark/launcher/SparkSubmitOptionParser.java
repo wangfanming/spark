@@ -160,7 +160,7 @@ class SparkSubmitOptionParser {
           idx++;
           value = args.get(idx);
         }
-        if (!handle(name, value)) {
+        if (!handle(name, value)) {  //SparkSubmitArguments 里面的handle
           break;
         }
         continue;
@@ -175,7 +175,7 @@ class SparkSubmitOptionParser {
         continue;
       }
 
-      if (!handleUnknown(arg)) {
+      if (!handleUnknown(arg)) { //调用SparkSubmitArguments的handleUnknown方法完成
         break;
       }
     }

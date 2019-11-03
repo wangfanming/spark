@@ -83,5 +83,6 @@ fi
 CMD=()
 while IFS= read -d '' -r ARG; do
   CMD+=("$ARG")
+    # 将下边的输出 重定向到 read
 done < <("$RUNNER" -cp "$LAUNCH_CLASSPATH" org.apache.spark.launcher.Main "$@")
 exec "${CMD[@]}"

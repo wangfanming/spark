@@ -53,12 +53,12 @@ private[spark] class JdbcPartition(idx: Int, val lower: Long, val upper: Long) e
  */
 class JdbcRDD[T: ClassTag](
     sc: SparkContext,
-    getConnection: () => Connection,
-    sql: String,
-    lowerBound: Long,
-    upperBound: Long,
-    numPartitions: Int,
-    mapRow: (ResultSet) => T = JdbcRDD.resultSetToObjectArray _)
+    getConnection: () => Connection, //创建连接的函数
+    sql: String,  // 查询的SQL，必须有 "?<= ID AND ID <= ?"
+    lowerBound: Long,     //要取数据的id的最小行
+    upperBound: Long,     //要取数据的id的最大行号
+    numPartitions: Int,   //分区数
+    mapRow: (ResultSet) => T = JdbcRDD.resultSetToObjectArray _) //一个将ResultSet转化为需要类型的方法
   extends RDD[T](sc, Nil) with Logging {
 
   override def getPartitions: Array[Partition] = {
@@ -66,7 +66,7 @@ class JdbcRDD[T: ClassTag](
     val length = BigInt(1) + upperBound - lowerBound
     (0 until numPartitions).map(i => {
       val start = lowerBound + ((i * length) / numPartitions)
-      val end = lowerBound + (((i + 1) * length) / numPartitions) - 1
+      val end = lowerBound + (((i + 1) * length) / numPartitions) - 1  //最后边的这个减一正好和下一个分区开始分开
       new JdbcPartition(i, start.toLong, end.toLong)
     }).toArray
   }

@@ -429,6 +429,7 @@ object SparkSubmit {
 
     // A list of rules to map each argument to system properties or command-line options in
     // each deploy mode; we iterate through these below
+    //OptionAssigner：主要目的是为Driver应用提供获取各种属性值的封装。
     val options = List[OptionAssigner](
 
       // All cluster managers
@@ -490,6 +491,8 @@ object SparkSubmit {
 
     // In client mode, launch the application main class directly
     // In addition, add the main application jar and any added jars (if any) to the classpath
+    //只有在client模式下，才会将用户 --jars指定的依赖jar包添加到childClasspath里边
+    //所有的cluster模式下，spark.jars这个为key，添加到sysProps里面，在yarncluster模式下，
     if (deployMode == CLIENT) {
       childMainClass = args.mainClass
       if (isUserJar(args.primaryResource)) {
@@ -512,6 +515,7 @@ object SparkSubmit {
     // Add the application jar automatically so the user doesn't have to call sc.addJar
     // For YARN cluster mode, the jar is already distributed on each node as "app.jar"
     // For python and R files, the primary resource is already distributed as a regular file
+    //将用户打的jar包和--jars指定的jars，合并到spark。jars属性，executor在standalone模式下执行任务的时候，会通过spark.jars参数获取。
     if (!isYarnCluster && !args.isPython && !args.isR) {
       var jars = sysProps.get("spark.jars").map(x => x.split(",").toSeq).getOrElse(Seq.empty)
       if (isUserJar(args.primaryResource)) {
@@ -522,6 +526,8 @@ object SparkSubmit {
 
     // In standalone cluster mode, use the REST client to submit the application (Spark 1.3+).
     // All Spark parameters are expected to be passed to the client through system properties.
+    //在此处将用户打的jar，单独封装然后当作RestSubmissionClient参数，主要目的是传到worker端再启动driverwrapper的时候
+    //会将该jar设置到当时线程的contentClassLoader的Classpath里面，从而可以加载到用户的主程序然后执行。
     if (args.isStandaloneCluster) {
       if (args.useRest) {
         childMainClass = "org.apache.spark.deploy.rest.RestSubmissionClient"

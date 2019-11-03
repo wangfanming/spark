@@ -114,6 +114,7 @@ class NewHadoopRDD[K, V](
   }
 
   override def getPartitions: Array[Partition] = {
+    //在spark读写Hbase的时候，inputFormat : TableInputFormat
     val inputFormat = inputFormatClass.newInstance
     inputFormat match {
       case configurable: Configurable =>
@@ -121,6 +122,7 @@ class NewHadoopRDD[K, V](
       case _ =>
     }
     val jobContext = newJobContext(_conf, jobId)
+    //调用TableInputFormatBase的getSplits，获得分片数据
     val rawSplits = inputFormat.getSplits(jobContext).toArray
     val result = new Array[Partition](rawSplits.size)
     for (i <- 0 until rawSplits.size) {
@@ -131,10 +133,12 @@ class NewHadoopRDD[K, V](
 
   override def compute(theSplit: Partition, context: TaskContext): InterruptibleIterator[(K, V)] = {
     val iter = new Iterator[(K, V)] {
+      //获取已经构建好的分片
       val split = theSplit.asInstanceOf[NewHadoopPartition]
       logInfo("Input split: " + split.serializableHadoopSplit)
       val conf = getConf
 
+      //Metrics（度量、指标）
       val inputMetrics = context.taskMetrics
         .getInputMetricsForReadMethod(DataReadMethod.Hadoop)
 
@@ -155,6 +159,7 @@ class NewHadoopRDD[K, V](
       }
       inputMetrics.setBytesReadCallback(bytesReadCallback)
 
+      //构建InputFormat实例
       val format = inputFormatClass.newInstance
       format match {
         case configurable: Configurable =>
@@ -163,6 +168,7 @@ class NewHadoopRDD[K, V](
       }
       val attemptId = newTaskAttemptID(jobTrackerId, id, isMap = true, split.index, 0)
       val hadoopAttemptContext = newTaskAttemptContext(conf, attemptId)
+      //创建一个reader，实际上就是一个scan实例，在TableRecordReader中创建并添加了一个Scan对象
       private var reader = format.createRecordReader(
         split.serializableHadoopSplit.value, hadoopAttemptContext)
       reader.initialize(split.serializableHadoopSplit.value, hadoopAttemptContext)

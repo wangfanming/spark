@@ -65,6 +65,7 @@ private[spark] abstract class AsynchronousListenerBus[L <: AnyRef, E](name: Stri
   // A counter that represents the number of events produced and consumed in the queue
   private val eventLock = new Semaphore(0)
 
+  //定义一个消费者线程
   private val listenerThread = new Thread(name) {
     setDaemon(true)
     override def run(): Unit = Utils.tryOrStopSparkContext(sparkContext) {
@@ -119,6 +120,7 @@ private[spark] abstract class AsynchronousListenerBus[L <: AnyRef, E](name: Stri
       logError(s"$name has already stopped! Dropping event $event")
       return
     }
+    //将消息添加到事件队列
     val eventAdded = eventQueue.offer(event)
     if (eventAdded) {
       eventLock.release()

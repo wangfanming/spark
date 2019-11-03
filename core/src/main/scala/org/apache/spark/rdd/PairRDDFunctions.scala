@@ -1206,6 +1206,7 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
       outputMetrics.setRecordsWritten(recordsWritten)
     }
 
+    //调用上边定义的写入函数，完成写入操作
     self.context.runJob(self, writeToFile)
     writer.commitJob()
   }
