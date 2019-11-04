@@ -130,7 +130,7 @@ private[rest] class StandaloneSubmitRequestServlet(
       throw new SubmitRestMissingFieldException("Main class is missing.")
     }
 
-    // Optional fields
+    // Optional fields  在cluster模式下，appsource和driver依赖的jar是分开的。
     val sparkProperties = request.sparkProperties
     val driverMemory = sparkProperties.get("spark.driver.memory")
     val driverCores = sparkProperties.get("spark.driver.cores")
@@ -142,18 +142,18 @@ private[rest] class StandaloneSubmitRequestServlet(
     val environmentVariables = request.environmentVariables
 
     // Construct driver description
-    val conf = new SparkConf(false)
+    val conf = new SparkConf(false) //参数是个boolean值判断是否从当前系统获取这是。此处使用false，保留了RestSubmissionClient,也即是submit的时候获取的
       .setAll(sparkProperties)
       .set("spark.master", masterUrl)
     val extraClassPath = driverExtraClassPath.toSeq.flatMap(_.split(File.pathSeparator))
     val extraLibraryPath = driverExtraLibraryPath.toSeq.flatMap(_.split(File.pathSeparator))
     val extraJavaOpts = driverExtraJavaOptions.map(Utils.splitCommandString).getOrElse(Seq.empty)
-    val sparkJavaOpts = Utils.sparkJavaOpts(conf)
+    val sparkJavaOpts = Utils.sparkJavaOpts(conf)  //将所有SparkConf的转换成Java的参数，“-D$k=$v”,在driver端启动SparkContext的时候
     val javaOpts = sparkJavaOpts ++ extraJavaOpts
     val command = new Command(
-      "org.apache.spark.deploy.worker.DriverWrapper",
+      "org.apache.spark.deploy.worker.DriverWrapper", //直接执行的是这个封装类，通过自定义urlClassLoader指定Classpath的方式加载用户的jar，然后通过反射执行。
       Seq("{{WORKER_URL}}", "{{USER_JAR}}", mainClass) ++ appArgs, // args to the DriverWrapper
-      environmentVariables, extraClassPath, extraLibraryPath, javaOpts)
+      environmentVariables, extraClassPath, extraLibraryPath, javaOpts)  //也即是此时spark.jars  也就是说，--jars传来的参数在JavaOpts里面
     val actualDriverMemory = driverMemory.map(Utils.memoryStringToMb).getOrElse(DEFAULT_MEMORY)
     val actualDriverCores = driverCores.map(_.toInt).getOrElse(DEFAULT_CORES)
     val actualSuperviseDriver = superviseDriver.map(_.toBoolean).getOrElse(DEFAULT_SUPERVISE)
@@ -173,9 +173,9 @@ private[rest] class StandaloneSubmitRequestServlet(
       responseServlet: HttpServletResponse): SubmitRestProtocolResponse = {
     requestMessage match {
       case submitRequest: CreateSubmissionRequest =>
-        val driverDescription = buildDriverDescription(submitRequest)
+        val driverDescription = buildDriverDescription(submitRequest)  //准备好所有参数
         val response = masterEndpoint.askWithRetry[DeployMessages.SubmitDriverResponse](
-          DeployMessages.RequestSubmitDriver(driverDescription))
+          DeployMessages.RequestSubmitDriver(driverDescription))  //正式向master提交SubmitDriver的请求，就是申请启动driver
         val submitResponse = new CreateSubmissionResponse
         submitResponse.serverSparkVersion = sparkVersion
         submitResponse.message = response.message

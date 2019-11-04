@@ -416,15 +416,17 @@ private[deploy] class Master(
         context.reply(SubmitDriverResponse(self, false, None, msg))
       } else {
         logInfo("Driver submitted " + description.command.mainClass)
+        //创建driver的Description
         val driver = createDriver(description)
         persistenceEngine.addDriver(driver)
         waitingDrivers += driver
         drivers.add(driver)
-        schedule()
+        schedule() //调度
 
         // TODO: It might be good to instead have the submission client poll the master to determine
         //       the current status of the driver. For now it's simply "fire and forget".
 
+        //调度完成后，返回一个消息。
         context.reply(SubmitDriverResponse(self, true, Some(driver.id),
           s"Driver successfully submitted as ${driver.id}"))
       }
@@ -722,6 +724,7 @@ private[deploy] class Master(
         val worker = shuffledAliveWorkers(curPos)
         numWorkersVisited += 1
         if (worker.memoryFree >= driver.desc.mem && worker.coresFree >= driver.desc.cores) {
+          //通知worker启动Driver
           launchDriver(worker, driver)
           waitingDrivers -= driver
           launched = true

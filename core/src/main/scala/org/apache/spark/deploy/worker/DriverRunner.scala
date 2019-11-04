@@ -85,8 +85,9 @@ private[deploy] class DriverRunner(
           }
 
           // TODO: If we add ability to submit multiple jars they should also be added here
+          //buildProcessBuilder 该方法有两个默认值的备用参数，主要是准备程序运行的环境
           val builder = CommandUtils.buildProcessBuilder(driverDesc.command, securityManager,
-            driverDesc.mem, sparkHome.getAbsolutePath, substituteVariables)
+            driverDesc.mem, sparkHome.getAbsolutePath, substituteVariables)   //并不包含app所在的jar
           launchDriver(builder, driverDir, driverDesc.supervise)
         }
         catch {
@@ -148,7 +149,7 @@ private[deploy] class DriverRunner(
     if (!localJarFile.exists()) { // May already exist if running multiple workers on one node
       logInfo(s"Copying user jar $jarPath to $destPath")
       Utils.fetchFile(
-        driverDesc.jarUrl,
+        driverDesc.jarUrl,   //用户的jar，也即是appsource
         driverDir,
         conf,
         securityManager,
@@ -168,6 +169,7 @@ private[deploy] class DriverRunner(
     builder.directory(baseDir)
     def initialize(process: Process): Unit = {
       // Redirect stdout and stderr to files
+      //重定向输入输出流
       val stdout = new File(baseDir, "stdout")
       CommandUtils.redirectStream(process.getInputStream, stdout)
 

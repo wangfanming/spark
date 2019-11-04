@@ -84,6 +84,7 @@ private[spark] class RestSubmissionClient(master: String) extends Logging {
       validateMaster(m)
       val url = getSubmitUrl(m)
       try {
+        //将创建的消息发送出去，在Standalone模式下，会被StandaloneRestServer接收。
         response = postJson(url, request.toJson)
         response match {
           case s: CreateSubmissionResponse =>
@@ -404,6 +405,7 @@ private[spark] object RestSubmissionClient {
     val master = conf.getOption("spark.master").getOrElse {
       throw new IllegalArgumentException("'spark.master' must be set.")
     }
+    //SparkConf创建的时候获得的配置，以spark.开头的
     val sparkProperties = conf.getAll.toMap
     val client = new RestSubmissionClient(master)
     val submitRequest = client.constructSubmitRequest(
@@ -418,9 +420,9 @@ private[spark] object RestSubmissionClient {
     }
     val appResource = args(0)
     val mainClass = args(1)
-    val appArgs = args.slice(2, args.size)
-    val conf = new SparkConf
-    val env = filterSystemEnvironment(sys.env)
+    val appArgs = args.slice(2, args.size) //参数的顺序是（args.primaryResource(用户自己的jar)，args.mainClass,args.childArgs）
+    val conf = new SparkConf  //Create a SparkConf that loads defaults from system properties and the classpath
+    val env = filterSystemEnvironment(sys.env)  //只会获取SPARK_和MESOS_开头的环境变量
     run(appResource, mainClass, appArgs, conf, env)
   }
 

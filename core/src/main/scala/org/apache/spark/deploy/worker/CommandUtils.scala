@@ -46,9 +46,11 @@ object CommandUtils extends Logging {
       substituteArguments: String => String,
       classPaths: Seq[String] = Seq[String](),
       env: Map[String, String] = sys.env): ProcessBuilder = {
+    //结合command所要运行的环境，重新构建一个命令，假如本地环境变量，系统ClassPath，替换掉传过来的占位符。
     val localCommand = buildLocalCommand(
       command, securityMgr, substituteArguments, classPaths, env)
-    val commandSeq = buildCommandSeq(localCommand, memory, sparkHome)
+    //结合上步构建的localCommand构建一个结合本地环境的commonSeq,然后用它去构建一个processBuilder。
+    val commandSeq = buildCommandSeq(localCommand, memory, sparkHome) //driver，Executor的运行时内存
     val builder = new ProcessBuilder(commandSeq: _*)
     val environment = builder.environment()
     for ((key, value) <- localCommand.environment) {
@@ -83,7 +85,8 @@ object CommandUtils extends Logging {
       val libraryPaths = libraryPathEntries ++ cmdLibraryPath ++ env.get(libraryPathName)
       command.environment + ((libraryPathName, libraryPaths.mkString(File.pathSeparator)))
     } else {
-      command.environment
+      command.environment //RestSubmissionClient发送过来的环境变量，只有SPARK_和MESOS_开头的环境变量
+                          // 也即是对于driver端System.getenv()获取到的系统环境变量的值，如spark-env.sh初始化的SPARK_开头的环境变量，再提交的时候已经创建好了。
     }
 
     // set auth secret to env variable if needed
@@ -92,13 +95,15 @@ object CommandUtils extends Logging {
     }
 
     Command(
+      //对于driver并不是用户命令的入口，而是一个封装类org.apache.spark.deploy.worker.DriverWrapper,在封装类里面做了进一步的解析
+      //对于executor 是这个org.apache.spark.executor.CoarseGrainedExecutorBackend类
       command.mainClass,
       command.arguments.map(substituteArguments),
       newEnvironment,
       command.classPathEntries ++ classPath,
       Seq[String](), // library path already captured in environment variable
       // filter out auth secret from java options
-      command.javaOpts.filterNot(_.startsWith("-D" + SecurityManager.SPARK_AUTH_SECRET_CONF)))
+      command.javaOpts.filterNot(_.startsWith("-D" + SecurityManager.SPARK_AUTH_SECRET_CONF))) //spark.jars在此处
   }
 
   /** Spawn a thread that will redirect a given stream to a file */

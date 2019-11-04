@@ -614,6 +614,7 @@ object SparkSubmit {
     }
 
     // Load any properties specified through --conf and the default properties file
+    //SparkSubmitArgument创建的时候从sparkproperties文件里加载到了sparkProperties
     for ((k, v) <- args.sparkProperties) {
       sysProps.getOrElseUpdate(k, v)
     }
@@ -646,6 +647,7 @@ object SparkSubmit {
       sysProps("spark.submit.pyFiles") = formattedPyFiles
     }
 
+    //sysProps 包含了配置文件中的默认配置参数，以及用户设置的启动参数。包含spark.jars ,详见628行
     (childArgs, childClasspath, sysProps, childMainClass)
   }
 
@@ -676,15 +678,20 @@ object SparkSubmit {
         new ChildFirstURLClassLoader(new Array[URL](0),
           Thread.currentThread.getContextClassLoader)
       } else {
+        //把当前线程的类加载器Thread.currentThread.getContextClassLoader)作为用户自定义类加载器MutableURLClassLoader的父类加载器。
         new MutableURLClassLoader(new Array[URL](0),
           Thread.currentThread.getContextClassLoader)
       }
+    //线程默认类加载器如不设置采用的是系统类加载器，线程上下文类加载器会继承其父类加载器
     Thread.currentThread.setContextClassLoader(loader)
 
+    //只有在client模式下，用户的jar，--jars上传的jar全部打包到loader的classpath里面，所以，只要不少包，无论是隐式引用其它包的类，还是显式引用，都会被找到。
+    //--jars参数指定的jars在yarn-cluster模式下，直接被封装到childArgs里面了，传递给了yarn。client
     for (jar <- childClasspath) {
       addJarToClasspath(jar, loader)
     }
 
+    //standalone此处设置的系统属性，在启动RestSubmissionClient,yarn.client,YarnClientSchedulerBand会被下面执行的程序new saprk.conf操作获取使用。
     for ((key, value) <- sysProps) {
       System.setProperty(key, value)
     }
@@ -692,6 +699,7 @@ object SparkSubmit {
     var mainClass: Class[_] = null
 
     try {
+      //这里的类加载器采用的是上边设置的类加载器
       mainClass = Utils.classForName(childMainClass)
     } catch {
       case e: ClassNotFoundException =>
@@ -719,6 +727,7 @@ object SparkSubmit {
       printWarning("Subclasses of scala.App may not work correctly. Use a main() method instead.")
     }
 
+    //类RestSubmissionClient的main
     val mainMethod = mainClass.getMethod("main", new Array[String](0).getClass)
     if (!Modifier.isStatic(mainMethod.getModifiers)) {
       throw new IllegalStateException("The main method in the given main class must be static")
