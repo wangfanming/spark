@@ -17,34 +17,30 @@
 
 package org.apache.spark.scheduler
 
-import java.io.NotSerializableException
-import java.util.Properties
-import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.function.BiFunction
-
-import scala.annotation.tailrec
-import scala.collection.Map
-import scala.collection.mutable.{ArrayStack, HashMap, HashSet}
-import scala.concurrent.duration._
-import scala.language.existentials
-import scala.language.postfixOps
-import scala.util.control.NonFatal
-
 import org.apache.commons.lang3.SerializationUtils
-
 import org.apache.spark._
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.executor.TaskMetrics
-import org.apache.spark.internal.Logging
-import org.apache.spark.internal.config
+import org.apache.spark.internal.{Logging, config}
 import org.apache.spark.network.util.JavaUtils
 import org.apache.spark.partial.{ApproximateActionListener, ApproximateEvaluator, PartialResult}
 import org.apache.spark.rdd.{DeterministicLevel, RDD, RDDCheckpointData}
 import org.apache.spark.rpc.RpcTimeout
-import org.apache.spark.storage._
 import org.apache.spark.storage.BlockManagerMessages.BlockManagerHeartbeat
+import org.apache.spark.storage._
 import org.apache.spark.util._
+
+import java.io.NotSerializableException
+import java.util.Properties
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
+import java.util.function.BiFunction
+import scala.annotation.tailrec
+import scala.collection.Map
+import scala.collection.mutable.{ArrayStack, HashMap, HashSet}
+import scala.concurrent.duration._
+import scala.language.{existentials, postfixOps}
+import scala.util.control.NonFatal
 
 /**
  * The high-level scheduling layer that implements stage-oriented scheduling. It computes a DAG of
@@ -746,6 +742,7 @@ private[spark] class DAGScheduler(
       resultHandler: (Int, U) => Unit,
       properties: Properties): Unit = {
     val start = System.nanoTime
+    //提交至消息总线，由DAGScheduler.doOnReceive处理
     val waiter = submitJob(rdd, func, partitions, callSite, resultHandler, properties)
     ThreadUtils.awaitReady(waiter.completionFuture, Duration.Inf)
     waiter.completionFuture.value.get match {
@@ -981,6 +978,7 @@ private[spark] class DAGScheduler(
     try {
       // New stage creation may throw an exception if, for example, jobs are run on a
       // HadoopRDD whose underlying HDFS files have been deleted.
+      // 从最后一个Stage开始向前创建DAG
       finalStage = createResultStage(finalRDD, func, partitions, jobId, callSite)
     } catch {
       case e: BarrierJobSlotsNumberCheckFailed =>
@@ -1028,10 +1026,14 @@ private[spark] class DAGScheduler(
     jobIdToActiveJob(jobId) = job
     activeJobs += job
     finalStage.setActiveJob(job)
+    // 任务提交流程 - 根据jobId获取其对应的所有Stages,通知给消息总线，
+    // 在org.apache.spark.status.AppStatusListener.onJobStart方法中处理
     val stageIds = jobIdToStageIds(jobId).toArray
     val stageInfos = stageIds.flatMap(id => stageIdToStage.get(id).map(_.latestInfo))
+    // 根据SparkListenerJobStartshi事件，构建stage的DAG执行图,并刷新至UI
     listenerBus.post(
       SparkListenerJobStart(job.jobId, jobSubmissionTime, stageInfos, properties))
+    // 提交Stage开始执行
     submitStage(finalStage)
   }
 

@@ -17,34 +17,28 @@
 
 package org.apache.spark.rdd
 
-import java.util.Random
-
-import scala.collection.{mutable, Map}
-import scala.collection.mutable.ArrayBuffer
-import scala.io.Codec
-import scala.language.implicitConversions
-import scala.reflect.{classTag, ClassTag}
-import scala.util.hashing
-
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus
-import org.apache.hadoop.io.{BytesWritable, NullWritable, Text}
 import org.apache.hadoop.io.compress.CompressionCodec
+import org.apache.hadoop.io.{BytesWritable, NullWritable, Text}
 import org.apache.hadoop.mapred.TextOutputFormat
-
-import org.apache.spark._
 import org.apache.spark.Partitioner._
+import org.apache.spark._
 import org.apache.spark.annotation.{DeveloperApi, Experimental, Since}
 import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.internal.Logging
-import org.apache.spark.partial.BoundedDouble
-import org.apache.spark.partial.CountEvaluator
-import org.apache.spark.partial.GroupedCountEvaluator
-import org.apache.spark.partial.PartialResult
+import org.apache.spark.partial.{BoundedDouble, CountEvaluator, GroupedCountEvaluator, PartialResult}
 import org.apache.spark.storage.{RDDBlockId, StorageLevel}
-import org.apache.spark.util.{BoundedPriorityQueue, Utils}
 import org.apache.spark.util.collection.{OpenHashMap, Utils => collectionUtils}
-import org.apache.spark.util.random.{BernoulliCellSampler, BernoulliSampler, PoissonSampler,
-  SamplingUtils}
+import org.apache.spark.util.random.{BernoulliCellSampler, BernoulliSampler, PoissonSampler, SamplingUtils}
+import org.apache.spark.util.{BoundedPriorityQueue, Utils}
+
+import java.util.Random
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.{Map, mutable}
+import scala.io.Codec
+import scala.language.implicitConversions
+import scala.reflect.{ClassTag, classTag}
+import scala.util.hashing
 
 /**
  * A Resilient Distributed Dataset (RDD), the basic abstraction in Spark. Represents an immutable,
@@ -129,6 +123,7 @@ abstract class RDD[T: ClassTag](
    * Implemented by subclasses to return how this RDD depends on parent RDDs. This method will only
    * be called once, so it is safe to implement a time-consuming computation in it.
    */
+  // 并不是所有RDD都有deps，没有父RDD的，该值为Nil
   protected def getDependencies: Seq[Dependency[_]] = deps
 
   /**
@@ -249,6 +244,7 @@ abstract class RDD[T: ClassTag](
    * RDD is checkpointed or not.
    */
   final def dependencies: Seq[Dependency[_]] = {
+    //构建窄依赖(父RDD分区与子RDD分区一一对应)
     checkpointRDD.map(r => List(new OneToOneDependency(r))).getOrElse {
       if (dependencies_ == null) {
         stateLock.synchronized {

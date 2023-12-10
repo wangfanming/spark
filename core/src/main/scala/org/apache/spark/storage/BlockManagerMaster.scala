@@ -17,15 +17,14 @@
 
 package org.apache.spark.storage
 
-import scala.collection.Iterable
-import scala.collection.generic.CanBuildFrom
-import scala.concurrent.Future
-
-import org.apache.spark.{SparkConf, SparkException}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc.RpcEndpointRef
 import org.apache.spark.storage.BlockManagerMessages._
 import org.apache.spark.util.{RpcUtils, ThreadUtils}
+import org.apache.spark.{SparkConf, SparkException}
+
+import scala.collection.generic.CanBuildFrom
+import scala.concurrent.Future
 
 private[spark]
 class BlockManagerMaster(
@@ -75,7 +74,7 @@ class BlockManagerMaster(
       diskSize: Long): Boolean = {
     val res = driverEndpoint.askSync[Boolean](
       UpdateBlockInfo(blockManagerId, blockId, storageLevel, memSize, diskSize))
-    logDebug(s"Updated info of block $blockId")
+    logDebug(s"Updated info of block $blockId ,$storageLevel,${memSize/1024},${diskSize/1024}")
     res
   }
 

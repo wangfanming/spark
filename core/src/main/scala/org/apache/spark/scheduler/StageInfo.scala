@@ -17,11 +17,11 @@
 
 package org.apache.spark.scheduler
 
-import scala.collection.mutable.HashMap
-
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.storage.RDDInfo
+
+import scala.collection.mutable.HashMap
 
 /**
  * :: DeveloperApi ::
@@ -86,6 +86,7 @@ private[spark] object StageInfo {
       taskMetrics: TaskMetrics = null,
       taskLocalityPreferences: Seq[Seq[TaskLocation]] = Seq.empty
     ): StageInfo = {
+    // 获取当前stage的RDD的窄依赖
     val ancestorRddInfos = stage.rdd.getNarrowAncestors.map(RDDInfo.fromRdd)
     val rddInfos = Seq(RDDInfo.fromRdd(stage.rdd)) ++ ancestorRddInfos
     new StageInfo(

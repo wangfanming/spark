@@ -17,13 +17,6 @@
 
 package org.apache.spark.status
 
-import java.util.Date
-import java.util.concurrent.ConcurrentHashMap
-import java.util.function.Function
-
-import scala.collection.JavaConverters._
-import scala.collection.mutable.HashMap
-
 import org.apache.spark._
 import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.internal.Logging
@@ -32,6 +25,13 @@ import org.apache.spark.status.api.v1
 import org.apache.spark.storage._
 import org.apache.spark.ui.SparkUI
 import org.apache.spark.ui.scope._
+import org.slf4j.LoggerFactory
+
+import java.util.Date
+import java.util.concurrent.ConcurrentHashMap
+import java.util.function.Function
+import scala.collection.JavaConverters._
+import scala.collection.mutable.HashMap
 
 /**
  * A Spark listener that writes application information to a data store. The types written to the
@@ -321,6 +321,7 @@ private[spark] class AppStatusListener(
       jobGroup,
       numTasks)
     liveJobs.put(event.jobId, job)
+    //更新job相关信息
     liveUpdate(job, now)
 
     event.stageInfos.foreach { stageInfo =>
@@ -329,6 +330,7 @@ private[spark] class AppStatusListener(
       val stage = getOrCreateStage(stageInfo)
       stage.jobs :+= job
       stage.jobIds += event.jobId
+      //更新stage（LiveStage）相关信息
       liveUpdate(stage, now)
     }
 
@@ -841,7 +843,7 @@ private[spark] class AppStatusListener(
       if (updatedStorageLevel.isDefined) {
         rdd.setStorageLevel(updatedStorageLevel.get)
       }
-
+      // 针对每个块都由一个链表来存储
       val partition = rdd.partition(block.name)
 
       val executors = if (updatedStorageLevel.isDefined) {
@@ -945,12 +947,11 @@ private[spark] class AppStatusListener(
       // Whether values are being added to or removed from the existing accounting.
       val diskDelta = event.blockUpdatedInfo.diskSize * (if (storageLevel.useDisk) 1 else -1)
       val memoryDelta = event.blockUpdatedInfo.memSize * (if (storageLevel.useMemory) 1 else -1)
-
       updateExecutorMemoryDiskInfo(exec, storageLevel, memoryDelta, diskDelta)
       maybeUpdate(exec, now)
     }
   }
-
+  val logger = LoggerFactory.getLogger(this.getClass)
   private def updateExecutorMemoryDiskInfo(
       exec: LiveExecutor,
       storageLevel: StorageLevel,
@@ -963,6 +964,9 @@ private[spark] class AppStatusListener(
         exec.usedOnHeap = addDeltaToValue(exec.usedOnHeap, memoryDelta)
       }
     }
+    log.debug(s"updateExecutorMemoryDiskInfo ,memSize: $memoryDelta , diskDelta: $diskDelta")
+    logger.debug(s"updateExecutorMemoryDiskInfo ,storageLevel: $storageLevel " +
+      s", memSize: $memoryDelta , diskDelta: $diskDelta")
     exec.memoryUsed = addDeltaToValue(exec.memoryUsed, memoryDelta)
     exec.diskUsed = addDeltaToValue(exec.diskUsed, diskDelta)
   }
