@@ -17,25 +17,24 @@
 
 package org.apache.spark.executor
 
-import java.net.URL
-import java.nio.ByteBuffer
-import java.util.Locale
-import java.util.concurrent.atomic.AtomicBoolean
-
-import scala.collection.mutable
-import scala.util.{Failure, Success}
-import scala.util.control.NonFatal
-
-import org.apache.spark._
 import org.apache.spark.TaskState.TaskState
+import org.apache.spark._
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.deploy.worker.WorkerWatcher
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc._
-import org.apache.spark.scheduler.{ExecutorLossReason, TaskDescription}
 import org.apache.spark.scheduler.cluster.CoarseGrainedClusterMessages._
+import org.apache.spark.scheduler.{ExecutorLossReason, TaskDescription}
 import org.apache.spark.serializer.SerializerInstance
 import org.apache.spark.util.{ThreadUtils, Utils}
+
+import java.net.URL
+import java.nio.ByteBuffer
+import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
+import scala.collection.mutable
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 private[spark] class CoarseGrainedExecutorBackend(
     override val rpcEnv: RpcEnv,
@@ -88,7 +87,7 @@ private[spark] class CoarseGrainedExecutorBackend(
 
     case RegisterExecutorFailed(message) =>
       exitExecutor(1, "Slave registration failed: " + message)
-
+    // 接收Driver发送过来的TaskSet,进行处理
     case LaunchTask(data) =>
       if (executor == null) {
         exitExecutor(1, "Received LaunchTask command but executor was null")

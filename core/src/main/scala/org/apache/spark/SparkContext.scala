@@ -17,29 +17,14 @@
 
 package org.apache.spark
 
-import java.io._
-import java.net.URI
-import java.util.{Arrays, Locale, Properties, ServiceLoader, UUID}
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
-
-import scala.collection.JavaConverters._
-import scala.collection.Map
-import scala.collection.generic.Growable
-import scala.collection.mutable.HashMap
-import scala.language.implicitConversions
-import scala.reflect.{classTag, ClassTag}
-import scala.util.control.NonFatal
-
 import com.google.common.collect.MapMaker
 import org.apache.commons.lang3.SerializationUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.io.{ArrayWritable, BooleanWritable, BytesWritable, DoubleWritable, FloatWritable, IntWritable, LongWritable, NullWritable, Text, Writable}
-import org.apache.hadoop.mapred.{FileInputFormat, InputFormat, JobConf, SequenceFileInputFormat, TextInputFormat}
-import org.apache.hadoop.mapreduce.{InputFormat => NewInputFormat, Job => NewHadoopJob}
+import org.apache.hadoop.io._
+import org.apache.hadoop.mapred.{Utils, _}
 import org.apache.hadoop.mapreduce.lib.input.{FileInputFormat => NewFileInputFormat}
-
+import org.apache.hadoop.mapreduce.{InputFormat => NewInputFormat, Job => NewHadoopJob}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.deploy.{LocalSparkCluster, SparkHadoopUtil}
@@ -51,14 +36,27 @@ import org.apache.spark.partial.{ApproximateEvaluator, PartialResult}
 import org.apache.spark.rdd._
 import org.apache.spark.rpc.RpcEndpointRef
 import org.apache.spark.scheduler._
-import org.apache.spark.scheduler.cluster.{CoarseGrainedSchedulerBackend, StandaloneSchedulerBackend}
+import org.apache.spark.scheduler.cluster.StandaloneSchedulerBackend
 import org.apache.spark.scheduler.local.LocalSchedulerBackend
 import org.apache.spark.status.AppStatusStore
 import org.apache.spark.status.api.v1.ThreadStackTrace
-import org.apache.spark.storage._
 import org.apache.spark.storage.BlockManagerMessages.TriggerThreadDump
+import org.apache.spark.storage._
 import org.apache.spark.ui.{ConsoleProgressBar, SparkUI}
 import org.apache.spark.util._
+
+import java.io._
+import java.net.URI
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
+import java.util.{Arrays, Locale, Properties, ServiceLoader, UUID}
+import scala.collection.JavaConverters._
+import scala.collection.Map
+import scala.collection.generic.Growable
+import scala.collection.mutable.HashMap
+import scala.language.implicitConversions
+import scala.reflect.{ClassTag, classTag}
+import scala.util.control.NonFatal
 
 /**
  * Main entry point for Spark functionality. A SparkContext represents the connection to a Spark
@@ -254,6 +252,7 @@ class SparkContext(config: SparkConf) extends Logging {
       conf: SparkConf,
       isLocal: Boolean,
       listenerBus: LiveListenerBus): SparkEnv = {
+    // 为Driver端初始化一个执行环境，使用基于Netty的消息系统来传递Endpoint之间的消息
     SparkEnv.createDriverEnv(conf, isLocal, listenerBus, SparkContext.numDriverCores(master, conf))
   }
 
@@ -493,11 +492,13 @@ class SparkContext(config: SparkConf) extends Logging {
     val (sched, ts) = SparkContext.createTaskScheduler(this, master, deployMode)
     _schedulerBackend = sched
     _taskScheduler = ts
+    // 创建DAGScheduler，初始化并启动DAGSchedulerEventProcessLoop，用于处理相应的事件
     _dagScheduler = new DAGScheduler(this)
     _heartbeatReceiver.ask[Boolean](TaskSchedulerIsSet)
 
     // start TaskScheduler after taskScheduler sets DAGScheduler reference in DAGScheduler's
     // constructor
+    // 启动taskScheduler的同时，也会启动相应的后端,同时根据配置的"spark.executor.instances"计算要启动的Executor个数
     _taskScheduler.start()
 
     _applicationId = _taskScheduler.applicationId()
@@ -2066,6 +2067,7 @@ class SparkContext(config: SparkConf) extends Logging {
     }
     dagScheduler.runJob(rdd, cleanedFunc, partitions, callSite, resultHandler, localProperties.get)
     progressBar.foreach(_.finishAll())
+    // 对需要进行保存的RDD进行保存
     rdd.doCheckpoint()
   }
 
@@ -2785,12 +2787,16 @@ object SparkContext extends Logging {
         (backend, scheduler)
 
       case masterUrl =>
+        // YarnClusterManager
         val cm = getClusterManager(masterUrl) match {
           case Some(clusterMgr) => clusterMgr
           case None => throw new SparkException("Could not parse Master URL: '" + master + "'")
         }
         try {
+          // 创建TaskScheduler,根据部署模式，决定是YarnClusterScheduler还是YarnScheduler
           val scheduler = cm.createTaskScheduler(sc, masterUrl)
+          // 创建SchedulerBackend，根据部署模式，决定是YarnClusterSchedulerBackend，还是YarnClientSchedulerBackend
+          // 接收事件，做出处理的大都是org.apache.spark.scheduler.cluster.CoarseGrainedSchedulerBackend
           val backend = cm.createSchedulerBackend(sc, masterUrl, scheduler)
           cm.initialize(scheduler, backend)
           (backend, scheduler)

@@ -17,16 +17,15 @@
 
 package org.apache.spark.scheduler
 
-import java.io.{FileInputStream, InputStream}
-import java.util.{Locale, NoSuchElementException, Properties}
-
-import scala.util.control.NonFatal
-import scala.xml.{Node, XML}
-
 import org.apache.spark.SparkConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.SchedulingMode.SchedulingMode
 import org.apache.spark.util.Utils
+
+import java.io.{FileInputStream, InputStream}
+import java.util.{Locale, NoSuchElementException, Properties}
+import scala.util.control.NonFatal
+import scala.xml.{Node, XML}
 
 /**
  * An interface to build Schedulable tree
@@ -199,6 +198,7 @@ private[spark] class FairSchedulableBuilder(val rootPool: Pool, conf: SparkConf)
         s"configuration (schedulingMode: $DEFAULT_SCHEDULING_MODE, " +
         s"minShare: $DEFAULT_MINIMUM_SHARE, weight: $DEFAULT_WEIGHT)")
     }
+    // 将包含TaskSet的TaskSetManager添加到TaskScheduler的执行队列里,将来会根据调度策略进行排序
     parentPool.addSchedulable(manager)
     logInfo("Added task set " + manager.name + " tasks to pool " + poolName)
   }

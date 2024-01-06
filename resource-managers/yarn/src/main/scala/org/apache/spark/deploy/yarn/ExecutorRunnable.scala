@@ -17,29 +17,27 @@
 
 package org.apache.spark.deploy.yarn
 
-import java.io.File
-import java.nio.ByteBuffer
-import java.util.Collections
-
-import scala.collection.JavaConverters._
-import scala.collection.mutable.{HashMap, ListBuffer}
-
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.DataOutputBuffer
 import org.apache.hadoop.security.UserGroupInformation
-import org.apache.hadoop.yarn.api._
 import org.apache.hadoop.yarn.api.ApplicationConstants.Environment
+import org.apache.hadoop.yarn.api._
 import org.apache.hadoop.yarn.api.records._
 import org.apache.hadoop.yarn.client.api.NMClient
 import org.apache.hadoop.yarn.conf.YarnConfiguration
 import org.apache.hadoop.yarn.ipc.YarnRPC
 import org.apache.hadoop.yarn.util.{ConverterUtils, Records}
-
-import org.apache.spark.{SecurityManager, SparkConf, SparkException}
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
 import org.apache.spark.network.util.JavaUtils
 import org.apache.spark.util.Utils
+import org.apache.spark.{SecurityManager, SparkConf, SparkException}
+
+import java.io.File
+import java.nio.ByteBuffer
+import java.util.Collections
+import scala.collection.JavaConverters._
+import scala.collection.mutable.{HashMap, ListBuffer}
 
 private[yarn] class ExecutorRunnable(
     container: Option[Container],
@@ -94,7 +92,7 @@ private[yarn] class ExecutorRunnable(
     val dob = new DataOutputBuffer()
     credentials.writeTokenStorageToStream(dob)
     ctx.setTokens(ByteBuffer.wrap(dob.getData()))
-
+    // 启动Executor的主进程CoarseGrainedExecutorBackend
     val commands = prepareCommand()
 
     ctx.setCommands(commands.asJava)
@@ -119,6 +117,7 @@ private[yarn] class ExecutorRunnable(
 
     // Send the start request to the ContainerManager
     try {
+      // 通过NodeManager客户端，启动具体的容器进程
       nmClient.startContainer(container.get, ctx)
     } catch {
       case ex: Exception =>
@@ -201,6 +200,7 @@ private[yarn] class ExecutorRunnable(
     val commands = prefixEnv ++
       Seq(Environment.JAVA_HOME.$$() + "/bin/java", "-server") ++
       javaOpts ++
+    // Executor进程的主类：CoarseGrainedExecutorBackend
       Seq("org.apache.spark.executor.CoarseGrainedExecutorBackend",
         "--driver-url", masterAddress,
         "--executor-id", executorId,

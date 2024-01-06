@@ -17,20 +17,19 @@
 
 package org.apache.spark.scheduler.cluster
 
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
-import javax.annotation.concurrent.GuardedBy
-
-import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
-import scala.concurrent.Future
-
-import org.apache.spark.{ExecutorAllocationClient, SparkEnv, SparkException, TaskState}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc._
 import org.apache.spark.scheduler._
 import org.apache.spark.scheduler.cluster.CoarseGrainedClusterMessages._
 import org.apache.spark.scheduler.cluster.CoarseGrainedSchedulerBackend.ENDPOINT_NAME
 import org.apache.spark.util.{RpcUtils, SerializableBuffer, ThreadUtils, Utils}
+import org.apache.spark.{ExecutorAllocationClient, SparkEnv, SparkException, TaskState}
+
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import javax.annotation.concurrent.GuardedBy
+import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
+import scala.concurrent.Future
 
 /**
  * A scheduler backend that waits for coarse-grained executors to connect.
@@ -245,9 +244,11 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
             new WorkerOffer(id, executorData.executorHost, executorData.freeCores,
               Some(executorData.executorAddress.hostPort))
         }.toIndexedSeq
+        // 把可以执行任务的Executors告诉TaskScheduler，开始执行Task
         scheduler.resourceOffers(workOffers)
       }
       if (!taskDescs.isEmpty) {
+        // 向Executor发出执行Task的事件
         launchTasks(taskDescs)
       }
     }
@@ -270,6 +271,8 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
           val workOffers = IndexedSeq(
             new WorkerOffer(executorId, executorData.executorHost, executorData.freeCores,
               Some(executorData.executorAddress.hostPort)))
+          // 为每个Executor制造一个票据，用来接受任务
+          // 同时记录Executor与节点、机架的关系
           scheduler.resourceOffers(workOffers)
         } else {
           Seq.empty
@@ -308,7 +311,7 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
 
           logDebug(s"Launching task ${task.taskId} on executor id: ${task.executorId} hostname: " +
             s"${executorData.executorHost}.")
-
+          // Driver通过executorEndpoint向executor发送LaunchTask，启动task的处理
           executorData.executorEndpoint.send(LaunchTask(new SerializableBuffer(serializedTask)))
         }
       }
@@ -389,6 +392,7 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
     }
 
     // TODO (prashant) send conf instead of properties
+    // 为Driver端创建远端连接
     driverEndpoint = createDriverEndpointRef(properties)
   }
 

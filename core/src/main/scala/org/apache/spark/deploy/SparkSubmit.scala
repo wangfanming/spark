@@ -17,17 +17,6 @@
 
 package org.apache.spark.deploy
 
-import java.io._
-import java.lang.reflect.{InvocationTargetException, Modifier, UndeclaredThrowableException}
-import java.net.URL
-import java.security.PrivilegedExceptionAction
-import java.text.ParseException
-import java.util.UUID
-
-import scala.annotation.tailrec
-import scala.collection.mutable.{ArrayBuffer, HashMap, Map}
-import scala.util.{Properties, Try}
-
 import org.apache.commons.lang3.StringUtils
 import org.apache.hadoop.conf.{Configuration => HadoopConfiguration}
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -44,7 +33,6 @@ import org.apache.ivy.core.settings.IvySettings
 import org.apache.ivy.plugins.matcher.GlobPatternMatcher
 import org.apache.ivy.plugins.repository.file.FileRepository
 import org.apache.ivy.plugins.resolver.{ChainResolver, FileSystemResolver, IBiblioResolver}
-
 import org.apache.spark._
 import org.apache.spark.api.r.RUtils
 import org.apache.spark.deploy.rest._
@@ -52,6 +40,16 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
 import org.apache.spark.launcher.SparkLauncher
 import org.apache.spark.util._
+
+import java.io._
+import java.lang.reflect.{InvocationTargetException, UndeclaredThrowableException}
+import java.net.URL
+import java.security.PrivilegedExceptionAction
+import java.text.ParseException
+import java.util.UUID
+import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
+import scala.util.{Properties, Try}
 
 /**
  * Whether to submit, kill, or request the status of an application.
@@ -83,6 +81,7 @@ private[spark] class SparkSubmit extends Logging {
       logInfo(appArgs.toString)
     }
     appArgs.action match {
+      // 在SparkSubmitArguments初始化时的默认值
       case SparkSubmitAction.SUBMIT => submit(appArgs, uninitLog)
       case SparkSubmitAction.KILL => kill(appArgs)
       case SparkSubmitAction.REQUEST_STATUS => requestStatus(appArgs)
@@ -158,6 +157,7 @@ private[spark] class SparkSubmit extends Logging {
             }
         }
       } else {
+        // 按照启动参数，启动Saprk框架
         runMain(args, uninitLog)
       }
     }
@@ -181,6 +181,7 @@ private[spark] class SparkSubmit extends Logging {
       }
     // In all other modes, just run the main class as prepared
     } else {
+      // 启动用户主类
       doRunMain()
     }
   }
@@ -813,6 +814,7 @@ private[spark] class SparkSubmit extends Logging {
     var mainClass: Class[_] = null
 
     try {
+      // yarn集群模式下，mainclass:org.apache.spark.deploy.yarn.YarnClusterApplication
       mainClass = Utils.classForName(childMainClass)
     } catch {
       case e: ClassNotFoundException =>
@@ -852,6 +854,7 @@ private[spark] class SparkSubmit extends Logging {
     }
 
     try {
+      // 启动YarnClusterApplication,由该类进行Driver和AM的初始化
       app.start(childArgs.toArray, sparkConf)
     } catch {
       case t: Throwable =>

@@ -16,20 +16,6 @@
  */
 package org.apache.spark.rpc.netty
 
-import java.io._
-import java.net.{InetSocketAddress, URI}
-import java.nio.ByteBuffer
-import java.nio.channels.{Pipe, ReadableByteChannel, WritableByteChannel}
-import java.util.concurrent._
-import java.util.concurrent.atomic.AtomicBoolean
-import javax.annotation.Nullable
-
-import scala.concurrent.{Future, Promise}
-import scala.reflect.ClassTag
-import scala.util.{DynamicVariable, Failure, Success, Try}
-import scala.util.control.NonFatal
-
-import org.apache.spark.{SecurityManager, SparkConf}
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.TransportContext
 import org.apache.spark.network.client._
@@ -39,6 +25,19 @@ import org.apache.spark.network.server._
 import org.apache.spark.rpc._
 import org.apache.spark.serializer.{JavaSerializer, JavaSerializerInstance, SerializationStream}
 import org.apache.spark.util.{ByteBufferInputStream, ByteBufferOutputStream, ThreadUtils, Utils}
+import org.apache.spark.{SecurityManager, SparkConf}
+
+import java.io._
+import java.net.{InetSocketAddress, URI}
+import java.nio.ByteBuffer
+import java.nio.channels.{Pipe, ReadableByteChannel, WritableByteChannel}
+import java.util.concurrent._
+import java.util.concurrent.atomic.AtomicBoolean
+import javax.annotation.Nullable
+import scala.concurrent.{Future, Promise}
+import scala.reflect.ClassTag
+import scala.util.control.NonFatal
+import scala.util.{DynamicVariable, Failure, Success, Try}
 
 private[netty] class NettyRpcEnv(
     val conf: SparkConf,
@@ -52,6 +51,7 @@ private[netty] class NettyRpcEnv(
     "rpc",
     conf.getInt("spark.rpc.io.threads", numUsableCores))
 
+  // 启动一个线程池，用来处理为本地Endpoint与远程Endpoint服务
   private val dispatcher: Dispatcher = new Dispatcher(this, numUsableCores)
 
   private val streamManager = new NettyStreamManager(this)
@@ -457,6 +457,8 @@ private[rpc] class NettyRpcEnvFactory extends RpcEnvFactory with Logging {
     // KryoSerializer in future, we have to use ThreadLocal to store SerializerInstance
     val javaSerializerInstance =
       new JavaSerializer(sparkConf).newInstance().asInstanceOf[JavaSerializerInstance]
+
+    // 创建基于Netty框架的消息系统
     val nettyEnv =
       new NettyRpcEnv(sparkConf, javaSerializerInstance, config.advertiseAddress,
         config.securityManager, config.numUsableCores)

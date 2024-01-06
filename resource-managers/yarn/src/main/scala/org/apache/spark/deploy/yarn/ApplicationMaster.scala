@@ -17,17 +17,6 @@
 
 package org.apache.spark.deploy.yarn
 
-import java.io.{File, IOException}
-import java.lang.reflect.{InvocationTargetException, Modifier}
-import java.net.{URI, URL}
-import java.security.PrivilegedExceptionAction
-import java.util.concurrent.{TimeoutException, TimeUnit}
-
-import scala.collection.mutable.HashMap
-import scala.concurrent.Promise
-import scala.concurrent.duration.Duration
-import scala.util.control.NonFatal
-
 import org.apache.commons.lang3.{StringUtils => ComStrUtils}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.util.StringUtils
@@ -36,7 +25,6 @@ import org.apache.hadoop.yarn.api.records._
 import org.apache.hadoop.yarn.conf.YarnConfiguration
 import org.apache.hadoop.yarn.exceptions.ApplicationAttemptNotFoundException
 import org.apache.hadoop.yarn.util.{ConverterUtils, Records}
-
 import org.apache.spark._
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.deploy.history.HistoryServer
@@ -46,9 +34,19 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
 import org.apache.spark.metrics.MetricsSystem
 import org.apache.spark.rpc._
-import org.apache.spark.scheduler.cluster.{CoarseGrainedSchedulerBackend, YarnSchedulerBackend}
 import org.apache.spark.scheduler.cluster.CoarseGrainedClusterMessages._
+import org.apache.spark.scheduler.cluster.{CoarseGrainedSchedulerBackend, YarnSchedulerBackend}
 import org.apache.spark.util._
+
+import java.io.{File, IOException}
+import java.lang.reflect.{InvocationTargetException, Modifier}
+import java.net.{URI, URL}
+import java.security.PrivilegedExceptionAction
+import java.util.concurrent.{TimeUnit, TimeoutException}
+import scala.collection.mutable.HashMap
+import scala.concurrent.Promise
+import scala.concurrent.duration.Duration
+import scala.util.control.NonFatal
 
 /**
  * Common application master functionality for Spark on Yarn.
@@ -447,6 +445,7 @@ private[spark] class ApplicationMaster(args: ApplicationMasterArguments) extends
     // the allocator is ready to service requests.
     rpcEnv.setupEndpoint("YarnAM", new AMEndpoint(rpcEnv, driverRef))
 
+    // 在分配到的容器内启动Executor进程
     allocator.allocateResources()
     val ms = MetricsSystem.createMetricsSystem("applicationMaster", sparkConf, securityMgr)
     val prefix = _sparkConf.get(YARN_METRICS_NAMESPACE).getOrElse(appId)
@@ -479,6 +478,7 @@ private[spark] class ApplicationMaster(args: ApplicationMasterArguments) extends
         val driverRef = rpcEnv.setupEndpointRef(
           RpcAddress(host, port),
           YarnSchedulerBackend.ENDPOINT_NAME)
+        // 创建资源分配器，启动Executor
         createAllocator(driverRef, userConf)
       } else {
         // Sanity check; should never happen in normal operation, since sc should only be null

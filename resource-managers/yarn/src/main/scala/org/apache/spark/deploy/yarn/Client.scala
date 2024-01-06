@@ -17,18 +17,6 @@
 
 package org.apache.spark.deploy.yarn
 
-import java.io.{FileSystem => _, _}
-import java.net.{InetAddress, UnknownHostException, URI}
-import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
-import java.security.PrivilegedExceptionAction
-import java.util.{Locale, Properties, UUID}
-import java.util.zip.{ZipEntry, ZipOutputStream}
-
-import scala.collection.JavaConverters._
-import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet, ListBuffer, Map}
-import scala.util.control.NonFatal
-
 import com.google.common.base.Objects
 import com.google.common.io.Files
 import org.apache.hadoop.conf.Configuration
@@ -36,26 +24,36 @@ import org.apache.hadoop.fs._
 import org.apache.hadoop.fs.permission.FsPermission
 import org.apache.hadoop.io.DataOutputBuffer
 import org.apache.hadoop.mapreduce.MRJobConfig
-import org.apache.hadoop.security.{Credentials, UserGroupInformation}
+import org.apache.hadoop.security.UserGroupInformation
 import org.apache.hadoop.util.StringUtils
-import org.apache.hadoop.yarn.api._
 import org.apache.hadoop.yarn.api.ApplicationConstants.Environment
+import org.apache.hadoop.yarn.api._
 import org.apache.hadoop.yarn.api.protocolrecords._
 import org.apache.hadoop.yarn.api.records._
 import org.apache.hadoop.yarn.client.api.{YarnClient, YarnClientApplication}
 import org.apache.hadoop.yarn.conf.YarnConfiguration
 import org.apache.hadoop.yarn.exceptions.ApplicationNotFoundException
 import org.apache.hadoop.yarn.util.Records
-
-import org.apache.spark.{SecurityManager, SparkConf, SparkException}
 import org.apache.spark.api.python.PythonUtils
-import org.apache.spark.deploy.{SparkApplication, SparkHadoopUtil}
 import org.apache.spark.deploy.yarn.config._
 import org.apache.spark.deploy.yarn.security.YARNHadoopDelegationTokenManager
+import org.apache.spark.deploy.{SparkApplication, SparkHadoopUtil}
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
 import org.apache.spark.launcher.{LauncherBackend, SparkAppHandle, YarnCommandBuilderUtils}
 import org.apache.spark.util.{CallerContext, Utils}
+import org.apache.spark.{SecurityManager, SparkConf, SparkException}
+
+import java.io.{FileSystem => _, _}
+import java.net.{InetAddress, URI, UnknownHostException}
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
+import java.security.PrivilegedExceptionAction
+import java.util.zip.{ZipEntry, ZipOutputStream}
+import java.util.{Locale, Properties, UUID}
+import scala.collection.JavaConverters._
+import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet, ListBuffer, Map}
+import scala.util.control.NonFatal
 
 private[spark] class Client(
     val args: ClientArguments,
@@ -176,11 +174,13 @@ private[spark] class Client(
       verifyClusterResources(newAppResponse)
 
       // Set up the appropriate contexts to launch our AM
+      // 拼凑启动命令，检查RM资源，解析并配置资源
       val containerContext = createContainerLaunchContext(newAppResponse)
       val appContext = createApplicationSubmissionContext(newApp, containerContext)
 
       // Finally, submit and monitor the application
       logInfo(s"Submitting application $appId to ResourceManager")
+      // 启动AM:ApplicationMaster
       yarnClient.submitApplication(appContext)
       launcherBackend.setAppId(appId.toString)
       reportLauncherState(SparkAppHandle.State.SUBMITTED)
@@ -1132,6 +1132,7 @@ private[spark] class Client(
    * throw an appropriate SparkException.
    */
   def run(): Unit = {
+    // 向Yarn提交应用,启动AM,在AM启动后，由其向NodeManager申请容器启动Executor
     this.appId = submitApplication()
     if (!launcherBackend.isConnected() && fireAndForget) {
       val report = getApplicationReport(appId)

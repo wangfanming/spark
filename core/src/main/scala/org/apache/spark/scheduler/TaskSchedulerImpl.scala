@@ -205,6 +205,7 @@ private[spark] class TaskSchedulerImpl(
     val tasks = taskSet.tasks
     logInfo("Adding task set " + taskSet.id + " with " + tasks.length + " tasks")
     this.synchronized {
+      // 组合模式，创建TaskSetManager，将TaskSet托管给TaskSetManager，也就是说每个TaskSet有一个TaskSetManager
       val manager = createTaskSetManager(taskSet, maxTaskFailures)
       val stage = taskSet.stageId
       val stageTaskSets =
@@ -223,6 +224,9 @@ private[spark] class TaskSchedulerImpl(
         ts.isZombie = true
       }
       stageTaskSets(taskSet.stageAttemptId) = manager
+      // schedulableBuilder 会在org.apache.spark.scheduler.TaskSchedulerImpl.initialize()时进行初始化，
+      // 该配置由“spark.scheduler.mode”的具体配置决定，默认FIFO调度策略
+      // 根据配置，采用不同的调度策略执行TaskSet
       schedulableBuilder.addTaskSetManager(manager, manager.taskSet.properties)
 
       if (!isLocal && !hasReceivedTask) {
@@ -240,6 +244,9 @@ private[spark] class TaskSchedulerImpl(
       }
       hasReceivedTask = true
     }
+    // backend:在org.apache.spark.SparkContext.createTaskScheduler()时，根据具体配置，会生成相应的后端，
+    // 这些后端都是CoarseGrainedSchedulerBackend的子接口的YarnSchedulerBackend的实现
+    // 这根具体的部署模式（cluser,client）相关,然后由相应的后端程序开始制作票据，交由Executor进行TaskSet的处理
     backend.reviveOffers()
   }
 
@@ -391,11 +398,12 @@ private[spark] class TaskSchedulerImpl(
           !blacklistTracker.isExecutorBlacklisted(offer.executorId)
       }
     }.getOrElse(offers)
-
+    // 对票据进行洗牌，使Task尽可能分散执行
     val shuffledOffers = shuffleOffers(filteredOffers)
     // Build a list of tasks to assign to each worker.
     val tasks = shuffledOffers.map(o => new ArrayBuffer[TaskDescription](o.cores / CPUS_PER_TASK))
     val availableCpus = shuffledOffers.map(o => o.cores).toArray
+    // 按照调度策略对TaskSet进行排序
     val sortedTaskSets = rootPool.getSortedTaskSetQueue
     for (taskSet <- sortedTaskSets) {
       logDebug("parentName: %s, name: %s, runningTasks: %s".format(
@@ -421,7 +429,9 @@ private[spark] class TaskSchedulerImpl(
       } else {
         var launchedAnyTask = false
         // Record all the executor IDs assigned barrier tasks on.
+        // 记录TaskSet将来在哪个Executor上运行
         val addressesWithDescs = ArrayBuffer[(String, TaskDescription)]()
+        // 找到一个合适的本地化级别启动任务
         for (currentMaxLocality <- taskSet.myLocalityLevels) {
           var launchedTaskAtCurrentMaxLocality = false
           do {

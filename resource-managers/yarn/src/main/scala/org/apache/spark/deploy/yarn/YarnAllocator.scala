@@ -17,32 +17,29 @@
 
 package org.apache.spark.deploy.yarn
 
-import java.util.Collections
-import java.util.concurrent._
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.regex.Pattern
-
-import scala.collection.JavaConverters._
-import scala.collection.mutable
-import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
-import scala.util.control.NonFatal
-
 import org.apache.hadoop.yarn.api.records._
 import org.apache.hadoop.yarn.client.api.AMRMClient
 import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest
 import org.apache.hadoop.yarn.conf.YarnConfiguration
-
-import org.apache.spark.{SecurityManager, SparkConf, SparkException}
 import org.apache.spark.deploy.yarn.YarnSparkHadoopUtil._
 import org.apache.spark.deploy.yarn.config._
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
 import org.apache.spark.rpc.{RpcCallContext, RpcEndpointRef}
-import org.apache.spark.scheduler.{ExecutorExited, ExecutorLossReason}
-import org.apache.spark.scheduler.cluster.CoarseGrainedClusterMessages.RemoveExecutor
-import org.apache.spark.scheduler.cluster.CoarseGrainedClusterMessages.RetrieveLastAllocatedExecutorId
+import org.apache.spark.scheduler.cluster.CoarseGrainedClusterMessages.{RemoveExecutor, RetrieveLastAllocatedExecutorId}
 import org.apache.spark.scheduler.cluster.SchedulerBackendUtils
+import org.apache.spark.scheduler.{ExecutorExited, ExecutorLossReason}
 import org.apache.spark.util.{Clock, SystemClock, ThreadUtils}
+import org.apache.spark.{SecurityManager, SparkConf, SparkException}
+
+import java.util.Collections
+import java.util.concurrent._
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.regex.Pattern
+import scala.collection.JavaConverters._
+import scala.collection.mutable
+import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
+import scala.util.control.NonFatal
 
 /**
  * YarnAllocator is charged with requesting containers from the YARN ResourceManager and deciding
@@ -316,6 +313,7 @@ private[yarn] class YarnAllocator(
       // to maximize locality, include requests with no locality preference that can be cancelled
       val potentialContainers = availableContainers + anyHostRequests.size
 
+      // 计算容器所在节点及机架位置
       val containerLocalityPreferences = containerPlacementStrategy.localityOfRequestedContainers(
         potentialContainers, numLocalityAwareTasks, hostToLocalTaskCounts,
           allocatedHostToContainersMap, localRequests)
@@ -459,7 +457,7 @@ private[yarn] class YarnAllocator(
         internalReleaseContainer(container)
       }
     }
-
+    // 在容器中启动executor
     runAllocatedContainers(containersToUse)
 
     logInfo("Received %d containers from YARN, launching executors on %d of them."

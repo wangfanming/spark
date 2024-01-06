@@ -112,11 +112,16 @@ private[spark] class UnifiedMemoryManager private[memory] (
         // storage. We can reclaim any free memory from the storage pool. If the storage pool
         // has grown to become larger than `storageRegionSize`, we can evict blocks and reclaim
         // the memory that storage has borrowed from execution.
+
+        // 在Execution Pool没有足够空余内存时，可以回收storage pool内存，并且在storage pool使用的内存量
+        // 达到storageRegionSize配置时，可以将数据驱逐并回收
         val memoryReclaimableFromStorage = math.max(
           storagePool.memoryFree,
           storagePool.poolSize - storageRegionSize)
         if (memoryReclaimableFromStorage > 0) {
           // Only reclaim as much space as is necessary and available:
+          // math.min(numBytes - (ExecutionPool._poolSize - ExecutionPool.memoryUsed),
+          // math.max(storagePool.memoryFree,storagePool.poolSize - storageRegionSize))
           val spaceToReclaim = storagePool.freeSpaceToShrinkPool(
             math.min(extraMemoryNeeded, memoryReclaimableFromStorage))
           storagePool.decrementPoolSize(spaceToReclaim)
