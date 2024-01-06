@@ -17,20 +17,19 @@
 
 package org.apache.spark.scheduler
 
+import org.apache.spark.TaskState.TaskState
+import org.apache.spark._
+import org.apache.spark.internal.{Logging, config}
+import org.apache.spark.scheduler.SchedulingMode._
+import org.apache.spark.util._
+import org.apache.spark.util.collection.MedianHeap
+
 import java.io.NotSerializableException
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentLinkedQueue
-
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 import scala.math.max
 import scala.util.control.NonFatal
-
-import org.apache.spark._
-import org.apache.spark.TaskState.TaskState
-import org.apache.spark.internal.{config, Logging}
-import org.apache.spark.scheduler.SchedulingMode._
-import org.apache.spark.util.{AccumulatorV2, Clock, LongAccumulator, SystemClock, Utils}
-import org.apache.spark.util.collection.MedianHeap
 
 /**
  * Schedules the tasks within a single TaskSet in the TaskSchedulerImpl. This class keeps track of
@@ -463,7 +462,7 @@ private[spark] class TaskSetManager(
           allowedLocality = maxLocality
         }
       }
-
+      // 在dequeueTask计算过程中，会对Task可以执行的最优环境进行判断
       dequeueTask(execId, host, allowedLocality).map { case ((index, taskLocality, speculative)) =>
         // Found a task; do some bookkeeping and return a task description
         val task = tasks(index)
@@ -508,7 +507,7 @@ private[spark] class TaskSetManager(
         val taskName = s"task ${info.id} in stage ${taskSet.id}"
         logInfo(s"Starting $taskName (TID $taskId, $host, executor ${info.executorId}, " +
           s"partition ${task.partitionId}, $taskLocality, ${serializedTask.limit()} bytes)")
-
+        // 向消息总线发出BeginEvent事件
         sched.dagScheduler.taskStarted(task, info)
         new TaskDescription(
           taskId,
@@ -1037,6 +1036,7 @@ private[spark] class TaskSetManager(
             "Marking task %d in stage %s (on %s) as speculatable because it ran more than %.0f ms"
               .format(index, taskSet.id, info.host, threshold))
           speculatableTasks += index
+          // 满足推测执行条件的任务进行推测执行
           sched.dagScheduler.speculativeTaskSubmitted(tasks(index))
           foundTasks = true
         }
@@ -1067,7 +1067,7 @@ private[spark] class TaskSetManager(
    *
    */
   private def computeValidLocalityLevels(): Array[TaskLocality.TaskLocality] = {
-    import TaskLocality.{PROCESS_LOCAL, NODE_LOCAL, NO_PREF, RACK_LOCAL, ANY}
+    import TaskLocality._
     val levels = new ArrayBuffer[TaskLocality.TaskLocality]
     if (!pendingTasksForExecutor.isEmpty &&
         pendingTasksForExecutor.keySet.exists(sched.isExecutorAlive(_))) {

@@ -17,13 +17,12 @@
 
 package org.apache.spark.scheduler
 
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
-
-import scala.collection.JavaConverters._
-import scala.collection.mutable.ArrayBuffer
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.SchedulingMode.SchedulingMode
+
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
+import scala.collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * A Schedulable entity that represents collection of Pools or TaskSetManagers
@@ -91,6 +90,7 @@ private[spark] class Pool(
   override def checkSpeculatableTasks(minTimeToSpeculation: Int): Boolean = {
     var shouldRevive = false
     for (schedulable <- schedulableQueue.asScala) {
+      // 检测执行队列中是否有满足推测执行的task
       shouldRevive |= schedulable.checkSpeculatableTasks(minTimeToSpeculation)
     }
     shouldRevive

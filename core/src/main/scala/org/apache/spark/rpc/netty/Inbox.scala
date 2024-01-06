@@ -17,13 +17,12 @@
 
 package org.apache.spark.rpc.netty
 
-import javax.annotation.concurrent.GuardedBy
-
-import scala.util.control.NonFatal
-
 import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc.{RpcAddress, RpcEndpoint, ThreadSafeRpcEndpoint}
+
+import javax.annotation.concurrent.GuardedBy
+import scala.util.control.NonFatal
 
 
 private[netty] sealed trait InboxMessage
@@ -78,6 +77,7 @@ private[netty] class Inbox(
 
   // OnStart should be the first message to process
   inbox.synchronized {
+    // 向消息队列内添加OnStart事件
     messages.add(OnStart)
   }
 
