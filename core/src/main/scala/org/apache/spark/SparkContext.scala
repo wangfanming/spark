@@ -17,29 +17,14 @@
 
 package org.apache.spark
 
-import java.io._
-import java.net.URI
-import java.util.{Arrays, Locale, Properties, ServiceLoader, UUID}
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
-
-import scala.collection.JavaConverters._
-import scala.collection.Map
-import scala.collection.generic.Growable
-import scala.collection.mutable.HashMap
-import scala.language.implicitConversions
-import scala.reflect.{classTag, ClassTag}
-import scala.util.control.NonFatal
-
 import com.google.common.collect.MapMaker
 import org.apache.commons.lang3.SerializationUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.io.{ArrayWritable, BooleanWritable, BytesWritable, DoubleWritable, FloatWritable, IntWritable, LongWritable, NullWritable, Text, Writable}
-import org.apache.hadoop.mapred.{FileInputFormat, InputFormat, JobConf, SequenceFileInputFormat, TextInputFormat}
-import org.apache.hadoop.mapreduce.{InputFormat => NewInputFormat, Job => NewHadoopJob}
+import org.apache.hadoop.io._
+import org.apache.hadoop.mapred.{Utils, _}
 import org.apache.hadoop.mapreduce.lib.input.{FileInputFormat => NewFileInputFormat}
-
+import org.apache.hadoop.mapreduce.{InputFormat => NewInputFormat, Job => NewHadoopJob}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.deploy.{LocalSparkCluster, SparkHadoopUtil}
@@ -51,14 +36,27 @@ import org.apache.spark.partial.{ApproximateEvaluator, PartialResult}
 import org.apache.spark.rdd._
 import org.apache.spark.rpc.RpcEndpointRef
 import org.apache.spark.scheduler._
-import org.apache.spark.scheduler.cluster.{CoarseGrainedSchedulerBackend, StandaloneSchedulerBackend}
+import org.apache.spark.scheduler.cluster.StandaloneSchedulerBackend
 import org.apache.spark.scheduler.local.LocalSchedulerBackend
 import org.apache.spark.status.AppStatusStore
 import org.apache.spark.status.api.v1.ThreadStackTrace
-import org.apache.spark.storage._
 import org.apache.spark.storage.BlockManagerMessages.TriggerThreadDump
+import org.apache.spark.storage._
 import org.apache.spark.ui.{ConsoleProgressBar, SparkUI}
 import org.apache.spark.util._
+
+import java.io._
+import java.net.URI
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
+import java.util.{Arrays, Locale, Properties, ServiceLoader, UUID}
+import scala.collection.JavaConverters._
+import scala.collection.Map
+import scala.collection.generic.Growable
+import scala.collection.mutable.HashMap
+import scala.language.implicitConversions
+import scala.reflect.{ClassTag, classTag}
+import scala.util.control.NonFatal
 
 /**
  * Main entry point for Spark functionality. A SparkContext represents the connection to a Spark
